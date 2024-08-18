@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit</title>
+</head>
+<body>
+    <h1>Submit source</h1>
+    <button id="loginButton">Login with GitHub</button>
+    <div id="formContainer" style="display: none;">
+        <form id="commitForm">
+            <input type="text" id="repo" placeholder="Repository Name" required><br>
+            <input type="text" id="filename" placeholder="File Name" required><br>
+            <textarea id="content" placeholder="File Content" required></textarea><br>
+            <button type="submit">Commit</button>
+        </form>
+    </div>
+    <script>
+        const clientId = 'YOUR_CLIENT_ID';
+        const loginButton = document.getElementById('loginButton');
+        const formContainer = document.getElementById('formContainer');
+        const commitForm = document.getElementById('commitForm');
+
+        let accessToken = '';
+
+        // Step 1: Login with GitHub
+        loginButton.onclick = function() {
+            const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo`;
+            window.location.href = authUrl;
+        };
+
+        // Step 2: Handle the OAuth Callback
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.hash.substring(1));
+            accessToken = urlParams.get('access_token');
+            console.log(accessToken)
+            if (accessToken) {
+                loginButton.style.display = 'none';
+                formContainer.style.display = 'block';
+            }
+        };
+
+        // Step 3: Handle Form Submission
+        commitForm.onsubmit = async function(event) {
+            event.preventDefault();
+            const repo = document.getElementById('repo').value;
+            const filename = document.getElementById('filename').value;
+            const content = document.getElementById('content').value;
+
+            try {
+                // Get the latest commit SHA
+                const refResponse = await fetch(`https://api.github.com/repos/YOUR_GITHUB_USERNAME/${repo}/git/refs/heads/main`, {
+                    headers: { Authorization: `token ${accessToken}` }
+                });
+                const refData = await refResponse.json();
+                const latestCommitSha = refData.object.sha;
+
+                // Get the tree SHA
+                const commitResponse = await fetch(`https://api.github.com/repos/YOUR_GITHUB_USERNAME/${repo}/git/commits/${latestCommitSha}`, {
+                    headers: { Authorization: `token ${accessToken}` }
+                });
+                const commitData = await commitResponse.json();
+                const treeSha = commitData.tree.sha;
+
+                // Create a new blob
+                const blobResponse = await fetch(`https://api.github.com/repos/YOUR_GITHUB_USERNAME/${repo}/git/blobs`, {
+                    method: 'POST',
+                    headers: { Authorization: `token ${accessToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content, encoding: 'utf-8' })
+                });
+                const blobData = await blobResponse.json();
+
+                // Create a new tree
+                const treeResponse = await fetch(`https://api.github.com/repos/YOUR_GITHUB_USERNAME/${repo}/git/trees`, {
+                    method: 'POST',
+                    headers: { Authorization: `token ${accessToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        base_tree: treeSha,
+                        tree: [{
+                            path: filename,
+                            mode: '100644',
+                            type: 'blob',
+                            sha: blobData.sha
+                        }]
+                    })
+                });
+                const treeData = await treeResponse.json();
+
+                // Create a new commit
+                const commitCreateResponse = await fetch(`https://api.github.com/repos/YOUR_GITHUB_USERNAME/${repo}/git/commits`, {
+                    method: 'POST',
+                    headers: { Authorization: `token ${accessToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: `Add ${filename}`,
+                        tree: treeData.sha,
+                        parents: [latestCommitSha]
+                    })
+                });
+                const commitCreateData = await commitCreateResponse.json();
+
+                // Update the reference of the branch to point to the new commit
+                await fetch(`https://api.github.com/repos/YOUR_GITHUB_USERNAME/${repo}/git/refs/heads/main`, {
+                    method: 'PATCH',
+                    headers: { Authorization: `token ${accessToken}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sha: commitCreateData.sha })
+                });
+
+                alert('File committed successfully!');
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred. Please check the console for details.');
+            }
+        };
+    </script>
+</body>
+</html>
