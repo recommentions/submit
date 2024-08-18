@@ -33,9 +33,25 @@
         // Step 2: Handle the OAuth Callback
         window.onload = async function() {
             const urlParams = new URLSearchParams(window.location.hash.substring(1));
-            accessToken = urlParams.get('coaccess_tokende');
-            console.log(accessToken)
-            if (accessToken) {
+            code = urlParams.get('code');
+            console.log(code)
+            if (code) {
+                // Exchange code for access token
+            const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    client_id: clientId,
+                    code: code,
+                    // Note: We're not including client_secret here
+                })
+            });
+
+            const tokenData = await tokenResponse.json();
+            accessToken = tokenData.access_token;
                 loginButton.style.display = 'none';
                 formContainer.style.display = 'block';
                 const octokit = new Octokit({ auth: accessToken });
