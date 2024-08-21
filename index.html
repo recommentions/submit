@@ -11,6 +11,11 @@
     import { Octokit, App } from "https://esm.sh/octokit";
     window.Octokit = Octokit;
 </script>
+<style>
+    input, button {
+        display: block;
+    }
+</style>
 <script type="text/babel">
     (async () => {
         const { useState, useEffect } = React;
@@ -25,6 +30,8 @@
                 if (octokit) {
                     octokit.rest.users.getAuthenticated().then( ( { data } ) => {
                         setUsername(data.login)
+                    } ).catch( () => {
+                        setOctokit();
                     } );
                 }
             },[octokit]);
@@ -37,8 +44,8 @@
                     }
                 }} method="POST" action="">
                     { !octokit && <>
-                        <input name="username" type="text" defaultValue="recommentions" autoComplete="username" />
-                        <input name="password" type="password" autoComplete="current-password" />
+                        <input id="username" name="username" type="text" autoComplete="username" placeholder="username" />
+                        <input id="password" name="password" type="password" autoComplete="current-password" placeholder="password" />
                         </> }
                     {username&& <>Logged in as {username}.</>}
                     <button type="submit">Submit</button>
