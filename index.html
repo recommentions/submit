@@ -35,13 +35,13 @@
                     if ( event.target.password.value ) {
                         setOctokit( new Octokit({ auth: event.target.password.value }))
                     }
-                }}>
+                }} method="POST" action="">
                     { !octokit && <>
-                        <input name="username" type="hidden" value="recommentions" autoComplete="username" />
+                        <input name="username" type="text" defaultValue="recommentions" autoComplete="username" />
                         <input name="password" type="password" autoComplete="current-password" />
                         </> }
                     {username&& <>Logged in as {username}.</>}
-                    <button>Submit</button>
+                    <button type="submit">Submit</button>
                 </form>
             );
         }
