@@ -1,77 +1,84 @@
-<!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Submit</title>
-    <script src="https://cdn.jsdelivr.net/npm/@octokit/core@6.1.2/dist-src/version.min.js"></script>
-</head>
-<body>
-    <h1>Submit source</h1>
-    <button id="loginButton">Login with GitHub</button>
-    <div id="formContainer" style="display: none;">
-        <form id="commitForm">
-            <input type="text" id="filename" placeholder="File Name" required><br>
-            <textarea id="content" placeholder="File Content" required></textarea><br>
-            <button type="submit">Commit</button>
-        </form>
-    </div>
-    <script>
-        const clientId = 'Ov23liAkNANM7XzLgLHn';
-        const loginButton = document.getElementById('loginButton');
-        const formContainer = document.getElementById('formContainer');
-        const commitForm = document.getElementById('commitForm');
+<meta charset="utf-8"> 
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@octokit/rest@21.0.2/dist-src/index.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Submit source</title>
+<div id="root"></div>
+<script type="module">
+    import { Octokit, App } from "https://esm.sh/octokit";
+    window.Octokit = Octokit;
+</script>
+<script type="text/babel">
+    (async () => {
+        const { useState, useEffect } = React;
+        const root = ReactDOM.createRoot( document.getElementById('root') );
+        root.render( <Profiles /> );
 
-        let accessToken = '';
+        function Profiles() {
+            const [auth, setAuth] = useState();
+            const [octokit, setOctokit] = useState();
+            const [username, setUsername] = useState();
 
-        // Step 1: Login with GitHub
-        loginButton.onclick = function() {
-            const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&response_type=token`;
-            window.location.href = authUrl;
-        };
-
-        // Step 2: Handle the OAuth Callback
-        window.onload = async function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            code = urlParams.get('code');
-            console.log(code)
-            if (code) {
-                // Exchange code for access token
-            const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    client_id: clientId,
-                    code: code,
-                    // Note: We're not including client_secret here
-                })
-            });
-
-            const tokenData = await tokenResponse.json();
-            accessToken = tokenData.access_token;
-                loginButton.style.display = 'none';
-                formContainer.style.display = 'block';
-                const octokit = new Octokit({ auth: accessToken });
-                const userInfo = await getUserInfo(octokit);
-                if (userInfo) {
-                    username = userInfo.login;
-                    console.log('Authenticated as:', username);
+            useEffect(() => {
+                if (octokit) {
+                    octokit.rest.users.getAuthenticated().then( ( { data } ) => {
+                        setUsername(data.login)
+                    } );
                 }
-            }
-        };
+            },[octokit]);
 
-        // Step 3: Handle Form Submission
-        commitForm.onsubmit = async function(event) {
-            event.preventDefault();
-            const repo = 'recommentions';
-            const filename = document.getElementById('filename').value;
-            const content = document.getElementById('content').value;
+            return (
+                <form onSubmit={(event) => {
+                    event.preventDefault();
+                    if ( event.target.auth.value ) {
+                        console.log(event.target.auth.value);
+                        setAuth(event.target.auth.value);
+                        setOctokit( new Octokit({ auth: event.target.auth.value }))
+                    }
+                }}>
+                    { !auth && <input name="auth" type="password" autoComplete="current-password" /> }
+                    {username&& <>Logged in as {username}.</>}
+                    <button>Submit</button>
+                </form>
+            );
+        }
+    })()
+</script>
+<!-- <script type="module">
+    import { Octokit, App } from "https://esm.sh/octokit";
+    const loginButton = document.getElementById('loginButton');
+    const formContainer = document.getElementById('formContainer');
+    const commitForm = document.getElementById('commitForm');
 
-            
-        };
-    </script>
-</body>
-</html>
+    async function getUserInfo(octokit) {
+        try {
+            const { data } = await octokit.rest.users.getAuthenticated();
+            return data;
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+            return null;
+        }
+    }
+
+    // Step 3: Handle Form Submission
+    commitForm.onsubmit = async function(event) {
+        event.preventDefault();
+        console.log(document.getElementById('token').value)
+        const octokit = new Octokit({ auth: document.getElementById('token').value });
+            const userInfo = await getUserInfo(octokit);
+            const username = userInfo.login;
+                console.log('Authenticated as:', username);
+        await octokit.rest.repos.createOrUpdateFileContents({
+            owner: 'recommentions',
+            repo: 'source',
+            path: 'books/test.json',
+            message: 'adding test',
+            content: btoa(JSON.stringify({
+                title: "test"
+            })),
+        });
+    };
+</script> -->
