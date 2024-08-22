@@ -654,6 +654,7 @@
             const [ profiles, setProfiles ] = useState( [] );
 
             useEffect(() => {
+                if ( ! octokit ) return;
                 octokit.rest.repos.getContent({
                     owner: 'recommentions',
                     repo: 'source',
@@ -768,9 +769,10 @@
 
             function onSubmit(event) {
                 event.preventDefault();
-                if ( event.target.password?.value ) {
-                    sessionStorage.setItem('password', event.target.password.value);
-                    setOctokit( new Octokit({ auth: event.target.password.value }))
+                const form = event.target.closest('form');
+                if ( form.password?.value ) {
+                    sessionStorage.setItem('password', form.password.value);
+                    setOctokit( new Octokit({ auth: form.password.value }))
                 } else {
                     if ( ! url ) {
                         alert('URL is required.');
@@ -836,7 +838,7 @@
                         <input id="username" name="username" type="text" autoComplete="username" placeholder="username" />
                         <input id="password" name="password" type="password" autoComplete="current-password" placeholder="password" />
                         </> }
-                    {<>
+                    {username && <>
                         <div>Logged in as {username}.</div>
                         <select name="profile" value={name} onChange={(event) => {
                             setName(event.target.value);
