@@ -4,6 +4,11 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@octokit/rest@21.0.2/dist-src/index.min.js"></script>
+<script src="https://unpkg.com/lodash@4.17.21/lodash.min.js"></script>
+<script>
+    module = window
+</script>
+<script src="https://unpkg.com/remove-accents@0.4.4/index.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Submit source</title>
 <div id="root"></div>
@@ -12,8 +17,132 @@
     window.Octokit = Octokit;
 </script>
 <style>
-    input, button {
+	* {
+        box-sizing: border-box;
+        font-size: 16px;
+        font-family: Georgia, 'Times New Roman', Times, serif;
+    }
+
+    body.saving * {
+        cursor: progress;
+    }
+
+    [readonly] {
+        background-color: lightgray;
+    }
+
+    table {
+        background: white;
+        width: 100%;
         display: block;
+        position: relative;
+        border: 1px solid black;
+    }
+
+    details.modal table {
+        overflow: scroll;
+    }
+
+    td {
+        vertical-align: top;
+    }
+
+    table img {
+        display: block;
+    }
+
+    .is-selected {
+        outline: 3px solid blue;
+    }
+
+    textarea {
+        display: block;
+    }
+
+    textarea.book {
+        white-space: pre;
+        overflow-wrap: normal;
+        overflow-x: scroll;
+    }
+
+    details summary {
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+
+    details.modal[open] {
+        z-index: 1;
+        position: fixed;
+        top: 20px;
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+        background-color: white;
+        padding: 20px;
+        overflow: hidden;
+    }
+
+    details.modal[open] summary {
+        margin-bottom: 20px;
+    }
+
+    details.modal:not([open]) summary::-webkit-details-marker {
+        display: none;
+    }
+
+    summary button {
+        pointer-events: none;
+    }
+
+    [data-no-book="true"] > summary {
+        background-color: yellow;
+    }
+
+    [data-duplicate="true"] > summary {
+        background-color: red;
+    }
+
+    [data-no-date="true"] > summary {
+        background-color: lightblue;
+    }
+
+    [data-no-date="true"] .date {
+        background-color: lightblue;
+    }
+
+    table {
+        position: relative;
+    }
+
+    thead {
+        background: white;
+        position: sticky;
+        top: 0;
+    }
+
+    .youtube {
+        position: relative;
+        padding-bottom: 56.25%;
+        height: 0;
+    }
+
+    .youtube iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    [data-placeholder]:empty::before {
+        content: attr( data-placeholder );
+        opacity: 0.5;
+    }
+
+    ul:empty::before {
+        content: 'Nothing found.';
+        opacity: 0.5;
     }
 </style>
 <script type="text/babel">
@@ -22,9 +151,582 @@
         const root = ReactDOM.createRoot( document.getElementById('root') );
         root.render( <Profiles /> );
 
+        function onBeforeInput( event ) {
+            if ( ! [
+                'insertText',
+                'deleteContentBackward',
+                'deleteContentForward',
+                'historyUndo',
+                'historyRedo'
+            ].includes( event.inputType ) ) {
+                console.log( event.inputType )
+                event.preventDefault()
+            }
+        }
+
+        function onPaste( event ) {
+            event.preventDefault();
+            const text = event.clipboardData.getData( 'text/plain' ).replace( /[\n\r]+/g, ' ' );
+            document.execCommand( 'insertText', false, text );
+        }
+
+        function Details( { summary, children, modal, ...props } ) {
+            const [ open, setOpen ] = React.useState( false );
+            return (
+                <details { ...props } onToggle={ ( event ) => {
+                    if ( event.target !== event.currentTarget ) return;
+                    setOpen( event.target.open );
+                } } className={ modal ? 'modal' : ''}>
+                    <summary>{ open && modal ? 'Close' : summary }</summary>
+                    { open && <div className="details-content">
+                        { children }
+                    </div> }
+                </details>
+            );
+        }
+
+        function CoversModal( { book, setBook } ) {
+            const [ isbns, setIsbns ] = React.useState( [] );
+            const [ titleAndSeries ] = book.title.split( ':' );
+            const [ series, title = series ] = titleAndSeries.split( ';' );
+
+            React.useEffect( () => {
+                fetch(
+                    'https://openlibrary.org/search.json?title=' +
+                    encodeURIComponent( stripPunctuation( title ) ) +
+                    '&author=' + encodeURIComponent( stripPunctuation( _.castArray( book.author )[0] ) )
+                ).then( ( response ) => response.json() ).then( ( results ) => {
+                    const isbns = _.compact( _.uniq( results.docs.reduce( ( acc, doc ) => [ ...acc, ...( doc.isbn || [] ) ], [] ) ) );
+                    const openLibraryIds = _.compact( _.uniq( results.docs.reduce( ( acc, doc ) => [ ...acc, doc.cover_i ], [] ) ) );
+                    setIsbns( [
+                        ...isbns.map( ( isbn ) => ( { isbn } ) ),
+                        ...openLibraryIds.map( ( openLibraryId ) => ( { openLibraryId } ) )
+                    ] );
+                } );
+            }, [] );
+
+            return (
+                <table>
+                    <tbody>
+                        <tr>{ isbns.map( ( { isbn, openLibraryId } ) =>
+                            <td style={ {minWidth: '100px'} } key={isbn||openLibraryId}>
+                                <img
+                                    onClick={ ( event ) => {
+                                        setBook( { isbn, openLibraryId } );
+                                        event.target.closest( 'details' ).removeAttribute( 'open' );
+                                    } }
+                                    className={ ( isbn ? book.isbn === isbn : book.openLibraryId === openLibraryId ) ? 'is-selected' : '' }
+                                    src={ `https://covers.openlibrary.org/b/${ isbn ? 'isbn' : 'id' }/${ isbn || openLibraryId }-L.jpg` }
+                                    loading="lazy"
+                                />
+                            </td>
+                        ) }</tr>
+                    </tbody>
+                </table>
+            );
+        }
+
+        function useRefEffect( callback, dependencies ) {
+            const cleanup = React.useRef();
+            return React.useCallback( ( node ) => {
+                if ( node ) {
+                    cleanup.current = callback( node );
+                } else if ( cleanup.current ) {
+                    cleanup.current();
+                }
+            }, dependencies );
+        }
+
+        function stripPunctuation( string ) {
+            return removeAccents( string ).replace( /[?.,:;()]/g, ' ' ).replace( /\s+/g, ' ' );
+        }
+
+        function findBook( books, name ) {
+            return books.find( ( book ) => `${ book.title }\n${ _.castArray( book.author ).join( '\n' ) }` === name );
+        }
+
+        function fetchJSONP(url) {
+            return new Promise((resolve, reject) => {
+                // Generate a unique callback name
+                const callbackName = `jsonp_callback_${Math.round(100000 * Math.random())}`;
+
+                // Create the script element
+                const script = document.createElement('script');
+                script.src = `${url}&callback=${callbackName}`;
+                script.onerror = function() {
+                    reject(new Error(`JSONP request to ${url} failed`));
+                    // Clean up in case of error
+                    delete window[callbackName];
+                };
+
+                // Create the callback function
+                window[callbackName] = function(data) {
+                    resolve(data);
+                    // Clean up: remove the script element and the global callback
+                    document.body.removeChild(script);
+                    delete window[callbackName];
+                };
+
+                // Append the script to the document to initiate the request
+                document.body.appendChild(script);
+            });
+        }
+
+        function Extract( { name, author: _author, featured, negative, extract: mention, __external, unquote, time, setExtract, remove, books, setBooks, domain, iframeRef } ) {
+            const book = findBook( books, name );
+            const [ bookResults, setBookResults ] = React.useState();
+            const [ selectedResult, setSelectedResult ] = React.useState();
+            const [ author, setAuthor ] = React.useState( _author );
+            const [ coverIds, setCoverIds ] = React.useState();
+            const [ pickedCoverIndex, setCoverIndex ] = React.useState( 0 );
+
+            function getBookId( b ) {
+                return `${ b.title }\n${ _.castArray( b.author ).join( '\n' ) }`;
+            }
+
+            React.useEffect( () => {
+                if ( book ) return;
+
+                const compatBook = books.find( ( book ) => book.title === name );
+
+                if ( ! compatBook ) return;
+
+                setExtract( ( extract ) => ( {
+                    ...extract,
+                    name: getBookId( compatBook ),
+                    author: undefined,
+                } ) );
+            }, [] );
+
+            function setBook( newBook ) {
+                setBooks( ( books ) => {
+                    const book = books.find( ( book ) => `${ book.title }\n${ _.castArray( book.author ).join( '\n' ) }` === name );
+                    if ( ! book ) return books;
+                    const index = books.indexOf( book );
+                    return [
+                        ...books.slice(0, index),
+                        {
+                            ...books[ index ],
+                            ...newBook
+                        },
+                        ...books.slice(index + 1)
+                    ]
+                } );
+            }
+
+            function onChangeResult( event ) {
+                setSelectedResult( event.target.value );
+            }
+
+            function toggleFeatured() {
+                setExtract( ( extract ) => ( {
+                    ...extract,
+                    featured: ! featured,
+                } ) );
+            }
+
+            function toggleNegative() {
+                setExtract( ( extract ) => ( {
+                    ...extract,
+                    negative: ! negative,
+                } ) );
+            }
+
+            function toggleExternal() {
+                setExtract( ( extract ) => ( {
+                    ...extract,
+                    __external: __external ? undefined : true,
+                } ) );
+            }
+
+            function toggleUnquote() {
+                setExtract( ( extract ) => ( {
+                    ...extract,
+                    unquote: unquote ? undefined : true,
+                } ) );
+            }
+
+            function updateMention( event ) {
+                const newMention = event.target.textContent.trim();
+                if ( mention === newMention ) return;
+                setExtract( ( extract ) => ( {
+                    ...extract,
+                    extract: newMention,
+                } ) );
+            }
+
+            function onFetchFirstCover( book ) {
+                const [ titleAndSeries ] = book.title.split( ':' );
+                const [ series, title = series ] = titleAndSeries.split( ';' );
+                fetch(
+                    'https://openlibrary.org/search.json?title=' +
+                    encodeURIComponent( stripPunctuation( title ) ) +
+                    '&author=' + encodeURIComponent( stripPunctuation( _.castArray( book.author )[0] ) )
+                ).then( ( response ) => response.json() ).then( ( results ) => {
+                    const [ firstResult ] = results.docs;
+                    if ( firstResult?.cover_i ) {
+                        setBook( {
+                            openLibraryId: firstResult.cover_i
+                        } );
+                    } else {
+                        alert( 'First book has no cover, try picking one.' );
+                    }
+                } );
+            }
+
+            function onDelete( event ) {
+                if ( event.key === 'Backspace' && ! event.target.textContent ) {
+                    remove();
+                    event.preventDefault();
+                }
+            }
+
+            function parseTimeToSeconds(timeString) {
+                const timeParts = timeString.split(':').reverse();
+                const seconds = parseInt(timeParts[0], 10) || 0;
+                const minutes = parseInt(timeParts[1], 10) || 0;
+                const hours = parseInt(timeParts[2], 10) || 0;
+
+                const totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+                return totalSeconds;
+            }
+
+            const tRegex = /^\s*\d{1,2}:\d{2}(?::\d{2})?\s*/;
+
+            function findFirstTimestamp(text) {
+                const match = text.match(tRegex);
+                return match ? match[0].trim() : null;
+            }
+
+            function removeTimestamps(text) {
+                return text.split('\n').map(line => line.replace(tRegex, '').trim()).filter(Boolean).join(' ');
+            }
+
+            const [ title, ...authors ] = name.split('\n');
+
+            const [ tempTitle, setTempTitle ] = React.useState();
+            const [ tempAuthors, setTempAuthors ] = React.useState();
+
+            React.useEffect( () => {
+                if ( book ) return;
+                const [ title, ...authors ] = name.split('\n');
+                setTempTitle( title );
+                setTempAuthors( authors );
+            }, [ book ] );
+
+            function addNewBook() {
+                setBooks( ( books ) => [
+                    ...books,
+                    {
+                        title: tempTitle,
+                        author: tempAuthors,
+                    },
+                ] );
+                setExtract( ( extract ) => {
+                    return {
+                        ...extract,
+                        name: [ tempTitle, ...tempAuthors ].join( '\n' ),
+                    };
+                } );
+                onFetchFirstCover( {
+                    title: tempTitle,
+                    author: tempAuthors,
+                } );
+                setTempTitle();
+                setTempAuthors();
+            }
+
+            return <>
+                <tr>
+                    <td>
+                        { book && ! ( book.isbn || book.openLibraryId ) && <button
+                            onClick={ () => onFetchFirstCover( book ) }
+                        >
+                            Pick first cover
+                        </button> }
+                        { book && <Details modal summary={
+                            <>
+                                { book && ( book.isbn || book.openLibraryId ) && <img
+                                    src={ `https://covers.openlibrary.org/b/${ book.isbn ? 'isbn' : 'id' }/${ book.isbn || book.openLibraryId }-L.jpg` }
+                                    style={ { maxWidth: '100px' } }
+                                    loading="lazy"
+                                /> }
+                                { book && ! ( book.isbn || book.openLibraryId ) && <button
+                                    >
+                                        Pick cover
+                                    </button> }
+                            </>
+                        }>
+                            <button onClick={ ( event ) => {
+                                setBook( {
+                                    isbn: undefined,
+                                    openLibraryId: undefined,
+                                } );
+                                event.target.closest( 'details' ).removeAttribute( 'open' );
+                            } }>Remove cover</button>
+                            <CoversModal book={ book } setBook={ setBook } />
+                        </Details> }
+                        { ! book && 'First insert a book.' }
+                    </td>
+                    <td>
+                        <div
+                            data-placeholder="Title"
+                            contentEditable={ ! book }
+                            suppressContentEditableWarning
+                            ref={ useRefEffect( ( element ) => {
+                                element.addEventListener( 'paste', onPaste );
+                                element.addEventListener( 'beforeinput', onBeforeInput );
+                                return () => {
+                                    element.removeEventListener( 'paste', onPaste );
+                                    element.removeEventListener( 'beforeinput', onBeforeInput );
+                                };
+                            }, [] ) }
+                            onInput={ () => {
+                                const newTitle = event.target.textContent.trim();
+                                setTempTitle( newTitle );
+                            } }
+                            onKeyDown={ onDelete }
+                            readOnly={ !! book }
+                        >
+                            { title }
+                        </div>
+                        <div
+                            data-placeholder="Authors"
+                            contentEditable={ ! book }
+                            suppressContentEditableWarning
+                            ref={ useRefEffect( ( element ) => {
+                                element.addEventListener( 'paste', onPaste );
+                                element.addEventListener( 'beforeinput', onBeforeInput );
+                                return () => {
+                                    element.removeEventListener( 'paste', onPaste );
+                                    element.removeEventListener( 'beforeinput', onBeforeInput );
+                                };
+                            }, [] ) }
+                            onInput={ () => {
+                                const newAuthors = event.target.textContent.split(',').map(author => author.trim());
+                                setTempAuthors( newAuthors );
+                            } }
+                            readOnly={ !! book }
+                        >
+                            { authors.join( ', ' ) }
+                        </div>
+                        { ! book && ( tempTitle || !! tempAuthors?.length ) && <>
+                            <hr />
+                            <p>Select existing book:</p>
+                            <ul>
+                            { books.reduce( ( acc, book ) => {
+                                if ( acc.length === 10 ) return acc;
+
+                                const [tempMainTitle] = _.kebabCase( tempTitle ).split( ':' );
+                                const [mainTitle] = _.kebabCase( book.title ).split( ':' );
+                                
+                                // check authors
+                                if ( tempAuthors?.length ) {
+                                    const bookAuthors = _.castArray( book.author );
+                                    const tempAuthorsMatch = tempAuthors.every( tempAuthor => {
+                                        const _tempAuthor = _.kebabCase( tempAuthor );
+                                        return bookAuthors.some( bookAuthor => {
+                                            const _bookAuthor = _.kebabCase( bookAuthor );
+                                            return _bookAuthor.includes( _tempAuthor )
+                                        } )
+                                    } );
+                                    if ( ! tempAuthorsMatch ) return acc;
+                                }
+
+                                if ( mainTitle.includes( tempMainTitle ) ) {
+                                    acc.push( book );
+                                }
+
+                                return acc;
+                            }, [] ).map( ( book, i ) => {
+                                return (
+                                    <li key={i} onClick={ () => {
+                                        setExtract( ( extract ) => ( {
+                                            ...extract,
+                                            name: getBookId( book ),
+                                        } ) );
+                                    } }>{ book.title } by { _.castArray( book.author ).join( ', ' ) }</li>
+                                );
+                            } ) }
+                            </ul>
+                        </> }
+                        { ! book && ( tempTitle ) && <button onClick={ addNewBook }>Or insert new book</button> }
+                    </td>
+                    <td>
+                        <div
+                            data-placeholder="Time"
+                            contentEditable
+                            suppressContentEditableWarning
+                            ref={ useRefEffect( ( element ) => {
+                                function onPasteMention( event ) {
+                                    const timeString = event.clipboardData.getData('text');
+                                    const seconds = parseTimeToSeconds(timeString);
+                                    setExtract( ( extract ) => ( {
+                                        ...extract,
+                                        time: seconds,
+                                    } ) );
+                                    event.preventDefault();
+                                }
+
+                                element.addEventListener( 'paste', onPasteMention );
+                                element.addEventListener( 'beforeinput', onBeforeInput );
+                                return () => {
+                                    element.removeEventListener( 'paste', onPasteMention );
+                                    element.removeEventListener( 'beforeinput', onBeforeInput );
+                                };
+                            }, [] ) }
+                            onBlur={ ( event ) => {
+                                const text = event.target.textContent.trim();
+                                const newTime = parseInt( text, 10 ) || undefined;
+                                if ( newTime !== time ) {
+                                    setExtract( ( extract ) => ( {
+                                        ...extract,
+                                        time: newTime,
+                                    } ) );
+                                }
+                            } }
+                        >
+                            { time }
+                        </div>
+                        { time && <button onClick={ () => {
+                            const url = new URL( iframeRef.current.src );
+                            // set time
+                            url.searchParams.set( 'autoplay', '1' );
+                            url.searchParams.set( 'start', time );
+                            iframeRef.current.src = url.toString();
+                            iframeRef.current.focus();
+                        } }>Play</button> }
+                    </td>
+                    { domain !== 'twitter.com' &&
+                        <td
+                            data-placeholder="Mention"
+                            contentEditable
+                            suppressContentEditableWarning
+                            ref={ useRefEffect( ( element ) => {
+                                function onPasteMention( event ) {
+                                    const text = event.clipboardData.getData( 'text/plain' );
+                                    const timestamp = findFirstTimestamp(text);
+
+                                    event.preventDefault();
+
+                                    console.log( 'onPasteMention', text, timestamp )
+
+                                    if ( timestamp ) {
+                                        document.execCommand( 'insertText', false, removeTimestamps(text) );
+
+                                        if ( ! time || confirm( 'Overwrite timestamp?' ) ) {
+                                            setExtract( ( extract ) => ( {
+                                                ...extract,
+                                                time: parseTimeToSeconds(timestamp),
+                                            } ) );
+                                        }
+                                    } else {
+                                        document.execCommand( 'insertText', false, text );
+                                    }
+                                }
+
+                                element.addEventListener( 'paste', onPasteMention );
+                                element.addEventListener( 'beforeinput', onBeforeInput );
+                                return () => {
+                                    element.removeEventListener( 'paste', onPasteMention );
+                                    element.removeEventListener( 'beforeinput', onBeforeInput );
+                                };
+                            }, [] ) }
+                            onBlur={ updateMention }
+                        >
+                            { mention }
+                        </td>
+                    }
+                    <td><input type="checkbox" checked={ featured === true } onChange={ toggleFeatured } /></td>
+                    <td><input type="checkbox" checked={ negative === true } onChange={ toggleNegative } /></td>
+                    <td><input type="checkbox" checked={ __external === true } onChange={ toggleExternal } /></td>
+                    <td><input type="checkbox" checked={ unquote === true } onChange={ toggleUnquote } /></td>
+                </tr>
+            </>;
+        }
+
         function Profiles() {
-            const [octokit, setOctokit] = useState();
+            const [octokit, setOctokit] = useState(
+                sessionStorage.getItem('password') ? new Octokit({ auth: sessionStorage.getItem('password') }) : undefined
+            );
+            const [initialBooks, setInitialBooks] = useState([]);
+            const [ books, setBooks ] = useState( [] );
+            const [ profiles, setProfiles ] = useState( [] );
+
+            useEffect(() => {
+                octokit.rest.repos.getContent({
+                    owner: 'recommentions',
+                    repo: 'source',
+                    path: 'profiles/profiles.jsonl',
+                }).then( ( { data } ) => {
+                    const lines = atob( data.content ).split( '\n' );
+                    const profiles = lines.map( ( line ) => JSON.parse( line ) );
+                    setProfiles( profiles );
+                    octokit.rest.repos.getContent({
+                        owner: 'recommentions',
+                        repo: 'source',
+                        path: 'books/books.jsonl',
+                    }).then( ( { data } ) => {
+                        const lines = atob( data.content ).split( '\n' );
+                        const books = lines.map( ( line ) => JSON.parse( line ) );
+                        setBooks( books );
+                        setInitialBooks( books );
+                    } ).catch( () => {
+                        setOctokit();
+                        sessionStorage.removeItem('password');
+                        alert('Loading books failed.');
+                    });
+                } ).catch( () => {
+                    setOctokit();
+                    sessionStorage.removeItem('password');
+                    alert('Loading profiles failed.');
+                });
+            },[octokit]);
+            
             const [username, setUsername] = useState();
+            const [name, setName] = useState('');
+            const [url, setURL] = useState('');
+            const [text, setText] = useState('');
+            const [date, setDate] = useState('');
+            const [extracts, setExtracts] = useState([]);
+
+            function onPasteURL( event ) {
+                const source = event.clipboardData.getData( 'text/plain' );
+                console.log({source})
+                event.preventDefault();
+                setURL( source );
+
+                if ( /x\.com/.test( source ) ) {
+                    fetchJSONP( 'https://publish.twitter.com/oembed?url=' + source ).then( ( response ) => {
+                        const doc = document.implementation.createHTMLDocument( '' );
+                        doc.body.innerHTML = response.html;
+
+                        console.log( doc, response.html)
+
+                        Promise.all(
+                            Array.from( doc.querySelectorAll( 'p a' ) )
+                            .filter( ( a ) => a.hostname === 't.co' && a.href === a.textContent )
+                            .map( ( a ) => {
+                                const secureHref = a.href.replace( /^http:/, 'https:' );
+                                return fetch( secureHref ).then( ( response ) => response.text() ).then( ( text ) => {
+                                    const match = text.match( /\<title>([^<]+)<\/title>/i );
+                                    
+                                    if ( match ) {
+                                        a.href = match[ 1 ];
+                                        a.textContent = match[ 1 ];
+                                    }
+                                } );
+                            } )
+                        ).then( () => {
+                            const contentTarget = doc.querySelector( 'p' );
+                            contentTarget.innerHTML = contentTarget.innerHTML.replace( /<br ?\/?>/gi, '\n' );
+
+                            setText(contentTarget.textContent);
+                            setDate(( new Date( doc.querySelector( 'blockquote > a' ).textContent + ' UTC' ) ).toISOString().split('T')[0]);
+                        } );
+                    } );
+                }
+            }
 
             useEffect(() => {
                 if (octokit) {
@@ -32,60 +734,168 @@
                         setUsername(data.login)
                     } ).catch( () => {
                         setOctokit();
+                        sessionStorage.removeItem('password');
                     } );
                 }
             },[octokit]);
 
+            function onAdd( additions = [ { name: '' } ] ) {
+                setExtracts( ( state ) => [
+                    ...( state || [] ),
+                    ...additions,
+                ] );
+            }
+
+            const iframeRef = React.useRef();
+
+            let domain = url;
+
+            if ( url ) {
+                try {
+                    url = new URL( url ).host.replace( /^www\./, '' );
+                } catch ( e ) {}
+            }
+
+            const source = {
+                name,
+                source: url,
+                content: text,
+                date,
+                extracts,
+            };
+
+            const newBooks = books.filter( book => ! initialBooks.includes( book ) );
+
+            function onSubmit(event) {
+                event.preventDefault();
+                if ( event.target.password?.value ) {
+                    sessionStorage.setItem('password', event.target.password.value);
+                    setOctokit( new Octokit({ auth: event.target.password.value }))
+                } else {
+                    if ( ! url ) {
+                        alert('URL is required.');
+                        return;
+                    }
+                    if ( ! date ) {
+                        alert('Text is required.');
+                        return;
+                    }
+
+                    if ( ! extracts.length ) {
+                        alert('At least one book is required.');
+                        return;
+                    }
+
+                    if ( ! name ) {
+                        alert('Profile is required.');
+                        return;
+                    }
+
+                    // Make sure all books have a title and author.
+                    if ( newBooks.some( ( book ) => ! book.title || ! book.author ) ) {
+                        alert('All books must have a title and author.');
+                        return;
+                    }
+
+                    Promise.all( newBooks.map( ( book ) => {
+                        return octokit.rest.repos.createOrUpdateFileContents({
+                            owner: 'recommentions',
+                            repo: 'source',
+                            path: `books/${_.kebabCase(book.title + ' by ' + _.castArray(book.author).join(', '))}.json`,
+                            message: 'Add book',
+                            content: btoa( JSON.stringify( book ) ),
+                        })
+                    } ) ).then( () => {
+                        setInitialBooks( books );
+                        octokit.rest.repos.createOrUpdateFileContents({
+                            owner: 'recommentions',
+                            repo: 'source',
+                            path: `sources/${ _.kebabCase(source.source) }.json`,
+                            message: 'Add source',
+                            content: btoa( JSON.stringify( source ) ),
+                        }).then( ( { data } ) => {
+                            alert('Saved source.');
+                            setExtracts([]);
+                            setURL('');
+                            setText('');
+                            setDate('');
+                        } ).catch( ( error ) => {
+                            alert('Saving source failed.');
+                        });
+                    }).catch( ( error ) => {
+                        alert('Saving books failed.');
+                    });
+                }
+            }
+
             return (
                 <form onSubmit={(event) => {
                     event.preventDefault();
-                    if ( event.target.password.value ) {
-                        setOctokit( new Octokit({ auth: event.target.password.value }))
-                    }
                 }} method="POST" action="">
                     { !octokit && <>
                         <input id="username" name="username" type="text" autoComplete="username" placeholder="username" />
                         <input id="password" name="password" type="password" autoComplete="current-password" placeholder="password" />
                         </> }
-                    {username&& <>Logged in as {username}.</>}
-                    <button type="submit">Submit</button>
+                    {<>
+                        <div>Logged in as {username}.</div>
+                        <select name="profile" value={name} onChange={(event) => {
+                            setName(event.target.value);
+                        }}>
+                            <option>Select profile</option>
+                            { profiles.map( ( profile, index ) => <option key={ index } value={ profile.name }>{ profile.name }</option> ) }
+                        </select>
+                        <input type="url" onPaste={ onPasteURL } value={url} placeholder="URL"
+                            onChange={(event) => setURL(event.target.value)}
+                        />
+                        <textarea
+                            value={text}
+                            onChange={(event) => setText(event.target.value)}
+                            placeholder="Text"
+                        />
+                        <input type="text" value={date} onChange={(event) => setDate(event.target.value)} />
+                        { books.length > 0 && <table>
+                            <colgroup>
+                                <col />
+                                <col style={ {width:'20%'}} />
+                            </colgroup>
+                            <thead>
+                                <tr>
+                                    <th scope="col">Cover</th>
+                                    <th scope="col">Book</th>
+                                    { domain !== 'x.com' && <th scope="col">Time</th> }
+                                    { domain !== 'x.com' && <th scope="col">Extract (Optional)</th> }
+                                    <th scope="col">Featured</th>
+                                    <th scope="col">Negative</th>
+                                    <th scope="col">External</th>
+                                    <th scope="col">Unquote</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                { extracts.map( ( { name, author, featured, negative, extract, __external, unquote, time }, index ) => {
+                                    function setExtract( newAttributes ) {
+                                        setExtracts( ( state ) => [
+                                            ...state.slice(0, index),
+                                            newAttributes( state[ index ] ),
+                                            ...state.slice(index + 1)
+                                        ] );
+                                    }
+                                    function remove() {
+                                        setExtracts( ( state ) => [
+                                            ...state.slice(0, index),
+                                            ...state.slice(index + 1)
+                                        ] );
+                                    }
+                                    return <Extract key={ index } { ...{ name, author, featured, negative, extract, __external, unquote, time, setExtract, remove, books, setBooks, domain, iframeRef } } />
+                                } ) }
+                                <tr colSpan="5"><td><button onClick={ () => onAdd() }>Add</button></td></tr>
+                            </tbody>
+                        </table> }
+                    </>}
+                    <button type="submit" onClick={onSubmit}>Submit</button>
+                    <pre>{ JSON.stringify( source, null, 2 ) }</pre>
+                    {newBooks.map((book, index) => <pre key={index}>{JSON.stringify(book, null, 2)}</pre>)}
                 </form>
             );
         }
     })()
 </script>
-<!-- <script type="module">
-    import { Octokit, App } from "https://esm.sh/octokit";
-    const loginButton = document.getElementById('loginButton');
-    const formContainer = document.getElementById('formContainer');
-    const commitForm = document.getElementById('commitForm');
-
-    async function getUserInfo(octokit) {
-        try {
-            const { data } = await octokit.rest.users.getAuthenticated();
-            return data;
-        } catch (error) {
-            console.error('Error fetching user info:', error);
-            return null;
-        }
-    }
-
-    // Step 3: Handle Form Submission
-    commitForm.onsubmit = async function(event) {
-        event.preventDefault();
-        console.log(document.getElementById('token').value)
-        const octokit = new Octokit({ auth: document.getElementById('token').value });
-            const userInfo = await getUserInfo(octokit);
-            const username = userInfo.login;
-                console.log('Authenticated as:', username);
-        await octokit.rest.repos.createOrUpdateFileContents({
-            owner: 'recommentions',
-            repo: 'source',
-            path: 'books/test.json',
-            message: 'adding test',
-            content: btoa(JSON.stringify({
-                title: "test"
-            })),
-        });
-    };
-</script> -->
