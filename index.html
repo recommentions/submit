@@ -151,6 +151,32 @@
         const root = ReactDOM.createRoot( document.getElementById('root') );
         root.render( <Profiles /> );
 
+        // Encode UTF-8 text to Base64
+        function encodeToBase64(text) {
+            const encoder = new TextEncoder();
+            const uint8Array = encoder.encode(text);
+
+            let binaryString = '';
+            uint8Array.forEach(byte => {
+                binaryString += String.fromCharCode(byte);
+            });
+
+            return btoa(binaryString);
+        }
+
+        // Decode Base64 to UTF-8 text
+        function decodeFromBase64(base64) {
+            const binaryString = atob(base64);
+            const uint8Array = new Uint8Array(binaryString.length);
+
+            for (let i = 0; i < binaryString.length; i++) {
+                uint8Array[i] = binaryString.charCodeAt(i);
+            }
+
+            const decoder = new TextDecoder();
+            return decoder.decode(uint8Array);
+        }
+
         function onBeforeInput( event ) {
             if ( ! [
                 'insertText',
@@ -660,7 +686,7 @@
                     repo: 'source',
                     path: 'profiles/profiles.jsonl',
                 }).then( ( { data } ) => {
-                    const lines = atob( data.content ).split( '\n' );
+                    const lines = decodeFromBase64( data.content ).split( '\n' );
                     const profiles = lines.map( ( line ) => JSON.parse( line ) );
                     setProfiles( profiles );
                     octokit.rest.repos.getContent({
@@ -668,7 +694,7 @@
                         repo: 'source',
                         path: 'books/books.jsonl',
                     }).then( ( { data } ) => {
-                        const lines = atob( data.content ).split( '\n' );
+                        const lines = decodeFromBase64( data.content ).split( '\n' );
                         const books = lines.map( ( line ) => JSON.parse( line ) );
                         setBooks( books );
                         setInitialBooks( books );
@@ -799,22 +825,27 @@
                         return;
                     }
 
+                    console.log(newBooks);
+
                     Promise.all( newBooks.map( ( book ) => {
                         return octokit.rest.repos.createOrUpdateFileContents({
                             owner: 'recommentions',
                             repo: 'source',
                             path: `books/${_.kebabCase(book.title + ' by ' + _.castArray(book.author).join(', '))}.json`,
                             message: 'Add book',
-                            content: btoa( JSON.stringify( book ) ),
+                            content: encodeToBase64( JSON.stringify( book ) ),
                         })
-                    } ) ).then( () => {
+                    } ) ).catch( ( error ) => {
+                        console.log(error);
+                        alert('Saving books failed.');
+                    }).then( () => {
                         setInitialBooks( books );
                         octokit.rest.repos.createOrUpdateFileContents({
                             owner: 'recommentions',
                             repo: 'source',
                             path: `sources/${ _.kebabCase(source.source) }.json`,
                             message: 'Add source',
-                            content: btoa( JSON.stringify( source ) ),
+                            content: encodeToBase64( JSON.stringify( source ) ),
                         }).then( ( { data } ) => {
                             alert('Saved source.');
                             setExtracts([]);
@@ -824,8 +855,6 @@
                         } ).catch( ( error ) => {
                             alert('Saving source failed.');
                         });
-                    }).catch( ( error ) => {
-                        alert('Saving books failed.');
                     });
                 }
             }
