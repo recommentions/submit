@@ -845,10 +845,7 @@
                             repo: 'source',
                             path: `sources/${ _.kebabCase(source.source) }.json`,
                             message: `Add source for ${source.name}`,
-                            content: encodeToBase64( JSON.stringify( {
-                                ...source,
-                                ctime: new Date().toISOString(),
-                            } ) ),
+                            content: encodeToBase64( JSON.stringify( source ) ),
                         }).then( ( { data } ) => {
                             alert(`Saved source for ${source.name}.`);
                             setExtracts([]);
