@@ -684,7 +684,7 @@
                 octokit.rest.repos.getContent({
                     owner: 'recommentions',
                     repo: 'source',
-                    path: 'profiles/profiles.jsonl',
+                    path: 'profiles.jsonl',
                 }).catch( () => {
                     alert('Loading profiles failed.');
                 }).then( ( { data } ) => {
