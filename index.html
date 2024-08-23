@@ -685,6 +685,8 @@
                     owner: 'recommentions',
                     repo: 'source',
                     path: 'profiles/profiles.jsonl',
+                }).catch( () => {
+                    alert('Loading profiles failed.');
                 }).then( ( { data } ) => {
                     const lines = decodeFromBase64( data.content ).split( '\n' );
                     const profiles = lines.map( ( line ) => JSON.parse( line ) );
@@ -703,11 +705,7 @@
                         sessionStorage.removeItem('password');
                         alert('Loading books failed.');
                     });
-                } ).catch( () => {
-                    setOctokit();
-                    sessionStorage.removeItem('password');
-                    alert('Loading profiles failed.');
-                });
+                } )
             },[octokit]);
             
             const [username, setUsername] = useState();
@@ -716,12 +714,14 @@
             const [text, setText] = useState('');
             const [date, setDate] = useState('');
             const [extracts, setExtracts] = useState([]);
+            const [isDuplicate, setDuplicate] = useState(false);
 
             function onPasteURL( event ) {
                 const source = event.clipboardData.getData( 'text/plain' );
                 console.log({source})
                 event.preventDefault();
                 setURL( source );
+                checkDuplicate( source );
 
                 if ( /x\.com/.test( source ) ) {
                     fetchJSONP( 'https://publish.twitter.com/oembed?url=' + source ).then( ( response ) => {
@@ -779,7 +779,7 @@
 
             if ( url ) {
                 try {
-                    url = new URL( url ).host.replace( /^www\./, '' );
+                    domain = new URL( url ).host.replace( /^www\./, '' );
                 } catch ( e ) {}
             }
 
@@ -825,8 +825,6 @@
                         return;
                     }
 
-                    console.log(newBooks);
-
                     Promise.all( newBooks.map( ( book ) => {
                         return octokit.rest.repos.createOrUpdateFileContents({
                             owner: 'recommentions',
@@ -859,6 +857,17 @@
                 }
             }
 
+            function checkDuplicate( value ) {
+                octokit.rest.repos.getContent({
+                    owner: 'recommentions',
+                    repo: 'source',
+                    path: 'sources.txt',
+                }).then( ( { data } ) => {
+                    const lines = decodeFromBase64( data.content ).split( '\n' );
+                    setDuplicate( lines.includes( value ) );
+                } );
+            }
+
             return (
                 <form onSubmit={(event) => {
                     event.preventDefault();
@@ -869,21 +878,35 @@
                         </> }
                     {username && <>
                         <div>Logged in as {username}.</div>
-                        <select name="profile" value={name} onChange={(event) => {
-                            setName(event.target.value);
-                        }}>
-                            <option>Select profile</option>
-                            { profiles.map( ( profile, index ) => <option key={ index } value={ profile.name }>{ profile.name }</option> ) }
-                        </select>
-                        <input type="url" onPaste={ onPasteURL } value={url} placeholder="URL"
-                            onChange={(event) => setURL(event.target.value)}
-                        />
-                        <textarea
-                            value={text}
-                            onChange={(event) => setText(event.target.value)}
-                            placeholder="Text"
-                        />
-                        <input type="text" value={date} onChange={(event) => setDate(event.target.value)} />
+                        <div>
+                            <select name="profile" value={name} onChange={(event) => {
+                                setName(event.target.value);
+                            }}>
+                                <option>Select profile</option>
+                                { profiles.map( ( profile, index ) => <option key={ index } value={ profile.name }>{ profile.name }</option> ) }
+                            </select>
+                        </div>
+                        <div>
+                            <input type="url" onPaste={ onPasteURL } value={url} placeholder="URL"
+                                onChange={(event) => setURL(event.target.value)}
+                                onBlur={(event) => {
+                                    checkDuplicate(url);
+                                }}
+                            />
+                            {isDuplicate && <mark>Duplicate!</mark>}
+                            {domain === 'twitter.com' && <mark>use x.com!</mark>}
+                            {domain === 'youtu.be' && <mark>use youtube.com!</mark>}
+                        </div>
+                        <div>
+                            <textarea
+                                value={text}
+                                onChange={(event) => setText(event.target.value)}
+                                placeholder="Text"
+                            />
+                        </div>
+                        <div>
+                            <input type="text" value={date} onChange={(event) => setDate(event.target.value)} placeholder="yyyy-mm-dd" />
+                        </div>
                         { books.length > 0 && <table>
                             <colgroup>
                                 <col />
@@ -922,7 +945,7 @@
                             </tbody>
                         </table> }
                     </>}
-                    <button type="submit" onClick={onSubmit}>Submit</button>
+                    <button type="submit" onClick={onSubmit} disabled={ isDuplicate || domain === 'x.com' || domain === 'youtu.be' }>Submit</button>
                     <pre>{ JSON.stringify( source, null, 2 ) }</pre>
                     {newBooks.map((book, index) => <pre key={index}>{JSON.stringify(book, null, 2)}</pre>)}
                 </form>
