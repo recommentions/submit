@@ -144,6 +144,10 @@
         content: 'Nothing found.';
         opacity: 0.5;
     }
+
+    [contenteditable] {
+        white-space: pre-wrap;
+    }
 </style>
 <script type="text/babel">
     (async () => {
@@ -183,7 +187,8 @@
                 'deleteContentBackward',
                 'deleteContentForward',
                 'historyUndo',
-                'historyRedo'
+                'historyRedo',
+                'insertLineBreak'
             ].includes( event.inputType ) ) {
                 console.log( event.inputType )
                 event.preventDefault()
@@ -298,7 +303,7 @@
             });
         }
 
-        function Extract( { name, author: _author, featured, negative, extract: mention, __external, unquote, time, setExtract, remove, books, setBooks, domain, iframeRef } ) {
+        function Extract( { name, author: _author, featured, negative, extract: mention, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef } ) {
             const book = findBook( books, name );
             const [ bookResults, setBookResults ] = React.useState();
             const [ selectedResult, setSelectedResult ] = React.useState();
@@ -462,6 +467,55 @@
                 setTempAuthors();
             }
 
+            const timeRef = useRefEffect( ( element ) => {
+                function onPasteMention( event ) {
+                    const timeString = event.clipboardData.getData('text');
+                    const seconds = parseTimeToSeconds(timeString);
+                    setExtract( ( extract ) => ( {
+                        ...extract,
+                        time: seconds,
+                    } ) );
+                    event.preventDefault();
+                }
+
+                element.addEventListener( 'paste', onPasteMention );
+                element.addEventListener( 'beforeinput', onBeforeInput );
+                return () => {
+                    element.removeEventListener( 'paste', onPasteMention );
+                    element.removeEventListener( 'beforeinput', onBeforeInput );
+                };
+            }, [] );
+            const mentionRef = useRefEffect( ( element ) => {
+                function onPasteMention( event ) {
+                    const text = event.clipboardData.getData( 'text/plain' );
+                    const timestamp = findFirstTimestamp(text);
+
+                    event.preventDefault();
+
+                    console.log( 'onPasteMention', text, timestamp )
+
+                    if ( timestamp ) {
+                        document.execCommand( 'insertText', false, removeTimestamps(text) );
+
+                        if ( ! time || confirm( 'Overwrite timestamp?' ) ) {
+                            setExtract( ( extract ) => ( {
+                                ...extract,
+                                time: parseTimeToSeconds(timestamp),
+                            } ) );
+                        }
+                    } else {
+                        document.execCommand( 'insertText', false, text );
+                    }
+                }
+
+                element.addEventListener( 'paste', onPasteMention );
+                element.addEventListener( 'beforeinput', onBeforeInput );
+                return () => {
+                    element.removeEventListener( 'paste', onPasteMention );
+                    element.removeEventListener( 'beforeinput', onBeforeInput );
+                };
+            }, [] )
+
             return <>
                 <tr>
                     <td>
@@ -578,29 +632,12 @@
                         </> }
                         { ! book && ( tempTitle ) && <button onClick={ addNewBook }>Or insert new book</button> }
                     </td>
-                    <td>
+                    { domain && domain !== 'x.com' && <td>
                         <div
                             data-placeholder="Time"
                             contentEditable
                             suppressContentEditableWarning
-                            ref={ useRefEffect( ( element ) => {
-                                function onPasteMention( event ) {
-                                    const timeString = event.clipboardData.getData('text');
-                                    const seconds = parseTimeToSeconds(timeString);
-                                    setExtract( ( extract ) => ( {
-                                        ...extract,
-                                        time: seconds,
-                                    } ) );
-                                    event.preventDefault();
-                                }
-
-                                element.addEventListener( 'paste', onPasteMention );
-                                element.addEventListener( 'beforeinput', onBeforeInput );
-                                return () => {
-                                    element.removeEventListener( 'paste', onPasteMention );
-                                    element.removeEventListener( 'beforeinput', onBeforeInput );
-                                };
-                            }, [] ) }
+                            ref={ timeRef }
                             onBlur={ ( event ) => {
                                 const text = event.target.textContent.trim();
                                 const newTime = parseInt( text, 10 ) || undefined;
@@ -622,47 +659,36 @@
                             iframeRef.current.src = url.toString();
                             iframeRef.current.focus();
                         } }>Play</button> }
-                    </td>
-                    { domain !== 'twitter.com' &&
+                    </td> }
+                    { domain !== 'x.com' &&
                         <td
                             data-placeholder="Mention"
                             contentEditable
                             suppressContentEditableWarning
-                            ref={ useRefEffect( ( element ) => {
-                                function onPasteMention( event ) {
-                                    const text = event.clipboardData.getData( 'text/plain' );
-                                    const timestamp = findFirstTimestamp(text);
-
-                                    event.preventDefault();
-
-                                    console.log( 'onPasteMention', text, timestamp )
-
-                                    if ( timestamp ) {
-                                        document.execCommand( 'insertText', false, removeTimestamps(text) );
-
-                                        if ( ! time || confirm( 'Overwrite timestamp?' ) ) {
-                                            setExtract( ( extract ) => ( {
-                                                ...extract,
-                                                time: parseTimeToSeconds(timestamp),
-                                            } ) );
-                                        }
-                                    } else {
-                                        document.execCommand( 'insertText', false, text );
-                                    }
-                                }
-
-                                element.addEventListener( 'paste', onPasteMention );
-                                element.addEventListener( 'beforeinput', onBeforeInput );
-                                return () => {
-                                    element.removeEventListener( 'paste', onPasteMention );
-                                    element.removeEventListener( 'beforeinput', onBeforeInput );
-                                };
-                            }, [] ) }
+                            ref={ mentionRef }
                             onBlur={ updateMention }
                         >
                             { mention }
                         </td>
                     }
+                    { ! domain && <td>
+                        <div
+                            data-placeholder="Chapter"
+                            contentEditable
+                            suppressContentEditableWarning
+                            onBlur={ ( event ) => {
+                                const newChapter = event.target.textContent.trim() ?? undefined;
+                                if ( newChapter !== chapter ) {
+                                    setExtract( ( extract ) => ( {
+                                        ...extract,
+                                        chapter: newChapter,
+                                    } ) );
+                                }
+                            } }
+                        >
+                            { chapter }
+                        </div>
+                    </td> }
                     <td><input type="checkbox" checked={ featured === true } onChange={ toggleFeatured } /></td>
                     <td><input type="checkbox" checked={ negative === true } onChange={ toggleNegative } /></td>
                     <td><input type="checkbox" checked={ __external === true } onChange={ toggleExternal } /></td>
@@ -775,7 +801,7 @@
 
             const iframeRef = React.useRef();
 
-            let domain = url;
+            let domain;
 
             if ( url ) {
                 try {
@@ -892,6 +918,7 @@
                                 onBlur={(event) => {
                                     checkDuplicate(url);
                                 }}
+                                style={{width:'100%'}}
                             />
                             {isDuplicate && <mark>Duplicate!</mark>}
                             {domain === 'twitter.com' && <mark>use x.com!</mark>}
@@ -902,6 +929,8 @@
                                 value={text}
                                 onChange={(event) => setText(event.target.value)}
                                 placeholder="Text"
+                                style={{width:'100%'}}
+                                rows="10"
                             />
                         </div>
                         <div>
@@ -918,6 +947,7 @@
                                     <th scope="col">Book</th>
                                     { domain !== 'x.com' && <th scope="col">Time</th> }
                                     { domain !== 'x.com' && <th scope="col">Extract (Optional)</th> }
+                                    { ! domain && <th scope="col">Chapter</th> }
                                     <th scope="col">Featured</th>
                                     <th scope="col">Negative</th>
                                     <th scope="col">External</th>
@@ -925,7 +955,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                { extracts.map( ( { name, author, featured, negative, extract, __external, unquote, time }, index ) => {
+                                { extracts.map( ( { name, author, featured, negative, extract, __external, unquote, time, chapter }, index ) => {
                                     function setExtract( newAttributes ) {
                                         setExtracts( ( state ) => [
                                             ...state.slice(0, index),
@@ -939,7 +969,7 @@
                                             ...state.slice(index + 1)
                                         ] );
                                     }
-                                    return <Extract key={ index } { ...{ name, author, featured, negative, extract, __external, unquote, time, setExtract, remove, books, setBooks, domain, iframeRef } } />
+                                    return <Extract key={ index } { ...{ name, author, featured, negative, extract, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef } } />
                                 } ) }
                                 <tr colSpan="5"><td><button onClick={ () => onAdd() }>Add</button></td></tr>
                             </tbody>
