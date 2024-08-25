@@ -516,6 +516,8 @@
                 };
             }, [] )
 
+            console.log({domain})
+
             return <>
                 <tr>
                     <td>
@@ -660,17 +662,6 @@
                             iframeRef.current.focus();
                         } }>Play</button> }
                     </td> }
-                    { domain !== 'x.com' &&
-                        <td
-                            data-placeholder="Mention"
-                            contentEditable
-                            suppressContentEditableWarning
-                            ref={ mentionRef }
-                            onBlur={ updateMention }
-                        >
-                            { mention }
-                        </td>
-                    }
                     { ! domain && <td>
                         <div
                             data-placeholder="Chapter"
@@ -689,6 +680,17 @@
                             { chapter }
                         </div>
                     </td> }
+                    { domain !== 'x.com' &&
+                        <td
+                            data-placeholder="Mention"
+                            contentEditable
+                            suppressContentEditableWarning
+                            ref={ mentionRef }
+                            onBlur={ updateMention }
+                        >
+                            { mention }
+                        </td>
+                    }
                     <td><input type="checkbox" checked={ featured === true } onChange={ toggleFeatured } /></td>
                     <td><input type="checkbox" checked={ negative === true } onChange={ toggleNegative } /></td>
                     <td><input type="checkbox" checked={ __external === true } onChange={ toggleExternal } /></td>
@@ -945,9 +947,9 @@
                                 <tr>
                                     <th scope="col">Cover</th>
                                     <th scope="col">Book</th>
-                                    { domain !== 'x.com' && <th scope="col">Time</th> }
-                                    { domain !== 'x.com' && <th scope="col">Extract (Optional)</th> }
+                                    { domain && domain !== 'x.com' && <th scope="col">Time</th> }
                                     { ! domain && <th scope="col">Chapter</th> }
+                                    { domain !== 'x.com' && <th scope="col">Extract (Optional)</th> }
                                     <th scope="col">Featured</th>
                                     <th scope="col">Negative</th>
                                     <th scope="col">External</th>
