@@ -593,8 +593,6 @@
         const [ books, setBooks ] = useState( [] );
         const [ profiles, setProfiles ] = useState( [] );
 
-        console.log(profiles)
-
         useEffect(() => {
             if ( ! octokit ) return;
             octokit.rest.repos.getContent({
@@ -811,41 +809,25 @@
                 {username && <>
                     <div>Logged in as {username}.</div>
                     <div>
-                        <div className="autocomplete-wrapper" style={{ position: 'relative' }}>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={(event) => {
-                                    setName(event.target.value);
-                                }}
-                                placeholder="Select or type profile name"
-                            />
-                            {name && !profiles.some(profile => profile.name === name) && <button onClick={ createNewProfile }>Insert new profile</button>}
-                            {name && !profiles.some(profile => profile.name === name) && (
-                                <select 
-                                    multiple 
-                                    className="autocomplete-list" 
-                                    style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        left: 0,
-                                        zIndex: 1000
-                                    }}
-                                >
-                                    {profiles
-                                        .filter(profile => profile.name.toLowerCase().includes(name.toLowerCase()))
-                                        .map((profile, index) => (
-                                            <option
-                                                key={index}
-                                                onClick={() => setName(profile.name)}
-                                            >
-                                                {profile.name}
-                                            </option>
-                                        ))
-                                    }
-                                </select>
-                            )}
-                        </div>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(event) => {
+                                setName(event.target.value);
+                            }}
+                            placeholder="Select or type profile name"
+                            list="profile-list"
+                        />
+                        <datalist id="profile-list">
+                            {profiles
+                                .filter(profile => profile.name.toLowerCase().includes(name.toLowerCase()))
+                                .filter(profile => profile.name !== name)
+                                .map((profile, index) => (
+                                    <option key={index} value={profile.name} />
+                                ))
+                            }
+                        </datalist>
+                        {name && !profiles.some(profile => profile.name === name) && <button onClick={createNewProfile}>Insert new profile</button>}
                     </div>
                     { profiles.some(profile => profile.name === name) &&
                         <>
