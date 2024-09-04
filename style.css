@@ -1,0 +1,137 @@
+* {
+    box-sizing: border-box;
+    font-size: 16px;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+}
+
+body {
+    background-color: #eee;
+}
+
+body.saving * {
+    cursor: progress;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+[readonly] {
+    background-color: lightgray;
+}
+
+table {
+    background: white;
+    width: 100%;
+    display: block;
+    position: relative;
+    border: 1px solid black;
+}
+
+details.modal table {
+    overflow: scroll;
+}
+
+td {
+    vertical-align: top;
+}
+
+table img {
+    display: block;
+}
+
+.is-selected {
+    outline: 3px solid blue;
+}
+
+textarea {
+    display: block;
+}
+
+textarea.book {
+    white-space: pre;
+    overflow-wrap: normal;
+    overflow-x: scroll;
+}
+
+details summary {
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+details.modal[open] {
+    z-index: 1;
+    position: fixed;
+    top: 20px;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    background-color: white;
+    padding: 20px;
+    overflow: hidden;
+}
+
+details.modal[open] summary {
+    margin-bottom: 20px;
+}
+
+details.modal:not([open]) summary::-webkit-details-marker {
+    display: none;
+}
+
+summary button {
+    pointer-events: none;
+}
+
+[data-no-book="true"] > summary {
+    background-color: yellow;
+}
+
+[data-duplicate="true"] > summary {
+    background-color: red;
+}
+
+[data-no-date="true"] > summary {
+    background-color: lightblue;
+}
+
+[data-no-date="true"] .date {
+    background-color: lightblue;
+}
+
+table {
+    position: relative;
+}
+
+thead {
+    background: white;
+    position: sticky;
+    top: 0;
+}
+
+.youtube {
+    position: relative;
+    padding-bottom: 56.25%;
+    height: 0;
+}
+
+.youtube iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+[data-placeholder]:empty::before {
+    content: attr( data-placeholder );
+    opacity: 0.5;
+}
+
+ul:empty::before {
+    content: 'Nothing found.';
+    opacity: 0.5;
+}
+
+[contenteditable] {
+    white-space: pre-wrap;
+}

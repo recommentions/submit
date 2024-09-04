@@ -1,36 +1,9 @@
-<html lang="en">
-<meta charset="utf-8"> 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Submit source</title>
-<div id="root"></div>
-<link rel="stylesheet" href="style.css">
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@latest",
-    "react-dom": "https://esm.sh/react-dom@latest",
-    "react/jsx-runtime": "https://esm.sh/react@latest/jsx-runtime",
-    "@octokit/rest": "https://cdn.jsdelivr.net/npm/@octokit/rest@21.0.2/dist-src/index.min.js",
-    "lodash": "https://esm.sh/lodash",
-    "remove-accents": "https://esm.sh/remove-accents",
-    "octokit": "https://esm.sh/octokit"
-  }
-}
-</script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script type="text/babel" data-type="module">
-    import { Octokit, App } from "octokit";
-    import React, { useState, useEffect, useRef, useCallback } from "react";
-    import ReactDOM from "react-dom";
-    import _ from 'lodash';
-    import removeAccents from 'remove-accents';
-
+import { Octokit, App } from "octokit";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import ReactDOM from "react-dom";
+(async () => {
     const root = ReactDOM.createRoot( document.getElementById('root') );
     root.render( <Profiles /> );
-
-    function setLoading( loading ) {
-        document.body.classList.toggle( 'loading', loading );
-    }
 
     // Encode UTF-8 text to Base64
     function encodeToBase64(text) {
@@ -593,8 +566,6 @@
         const [ books, setBooks ] = useState( [] );
         const [ profiles, setProfiles ] = useState( [] );
 
-        console.log(profiles)
-
         useEffect(() => {
             if ( ! octokit ) return;
             octokit.rest.repos.getContent({
@@ -784,22 +755,6 @@
             } );
         }
 
-        async function createNewProfile() {
-            setLoading(true);
-            await octokit.rest.repos.createOrUpdateFileContents({
-                owner: 'recommentions',
-                repo: 'source',
-                path: `profiles/${_.kebabCase(name)}.json`,
-                message: `Add profile: ${name}`,
-                content: encodeToBase64( JSON.stringify( { name, hide: true } ) ),
-            })
-            setProfiles( ( state ) => [
-                ...state,
-                { name, hide: true },
-            ] );
-            setLoading(false);
-        }
-
         return (
             <form onSubmit={(event) => {
                 event.preventDefault();
@@ -811,7 +766,7 @@
                 {username && <>
                     <div>Logged in as {username}.</div>
                     <div>
-                        <div className="autocomplete-wrapper" style={{ position: 'relative' }}>
+                        <div className="autocomplete-wrapper">
                             <input
                                 type="text"
                                 value={name}
@@ -820,32 +775,23 @@
                                 }}
                                 placeholder="Select or type profile name"
                             />
-                            {name && !profiles.some(profile => profile.name === name) && <button onClick={ createNewProfile }>Insert new profile</button>}
-                            {name && !profiles.some(profile => profile.name === name) && (
-                                <select 
-                                    multiple 
-                                    className="autocomplete-list" 
-                                    style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        left: 0,
-                                        zIndex: 1000
-                                    }}
-                                >
+                            {name && (
+                                <ul className="autocomplete-list">
                                     {profiles
                                         .filter(profile => profile.name.toLowerCase().includes(name.toLowerCase()))
                                         .map((profile, index) => (
-                                            <option
+                                            <li
                                                 key={index}
                                                 onClick={() => setName(profile.name)}
                                             >
                                                 {profile.name}
-                                            </option>
+                                            </li>
                                         ))
                                     }
-                                </select>
+                                </ul>
                             )}
                         </div>
+                        <button onClick={ () => {} }>Insert new profile</button>
                     </div>
                     <div>
                         <input type="text" onPaste={ onPasteURL } value={url} placeholder="URL or Book Title"
@@ -939,10 +885,10 @@
             </form>
         );
     }
+})()
 
-    // Are you sure you want to leave
-    window.addEventListener('beforeunload', function (e) {
-        e.preventDefault();
-        e.returnValue = 'Are you sure?';
-    });
-</script>
+// Are you sure you want to leave
+window.addEventListener('beforeunload', function (e) {
+    e.preventDefault();
+    e.returnValue = 'Are you sure?';
+});
