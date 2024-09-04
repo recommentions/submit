@@ -847,95 +847,99 @@
                             )}
                         </div>
                     </div>
-                    <div>
-                        <input type="text" onPaste={ onPasteURL } value={url} placeholder="URL or Book Title"
-                            onChange={(event) => setURL(event.target.value)}
-                            onBlur={(event) => {
-                                checkDuplicate(url);
-                            }}
-                            style={{width:'100%'}}
-                        />
-                        {isDuplicate && <mark>Duplicate!</mark>}
-                        {domain === 'twitter.com' && <mark>use x.com!</mark>}
-                        {domain === 'youtu.be' && <mark>use youtube.com!</mark>}
-                    </div>
-                    <div>
-                        <textarea
-                            value={text}
-                            onChange={(event) => setText(event.target.value)}
-                            placeholder="Text"
-                            style={{width:'100%'}}
-                            rows="10"
-                        />
-                    </div>
-                    <div>
-                        <input
-                            type="text"
-                            value={date}
-                            onChange={(event) => setDate(event.target.value)}
-                            placeholder="yyy-mm-dd, yyyy-mm, yyyy, or try pasting"
-                            onPaste={ ( event ) => {
-                                const text = event.clipboardData.getData( 'text/plain' );
+                    { profiles.some(profile => profile.name === name) &&
+                        <>
+                            <div>
+                                <input type="text" onPaste={ onPasteURL } value={url} placeholder="URL or Book Title"
+                                    onChange={(event) => setURL(event.target.value)}
+                                    onBlur={(event) => {
+                                        checkDuplicate(url);
+                                    }}
+                                    style={{width:'100%'}}
+                                />
+                                {isDuplicate && <mark>Duplicate!</mark>}
+                                {domain === 'twitter.com' && <mark>use x.com!</mark>}
+                                {domain === 'youtu.be' && <mark>use youtube.com!</mark>}
+                            </div>
+                            <div>
+                                <textarea
+                                    value={text}
+                                    onChange={(event) => setText(event.target.value)}
+                                    placeholder="Text"
+                                    style={{width:'100%'}}
+                                    rows="10"
+                                />
+                            </div>
+                            <div>
+                                <input
+                                    type="text"
+                                    value={date}
+                                    onChange={(event) => setDate(event.target.value)}
+                                    placeholder="yyy-mm-dd, yyyy-mm, yyyy, or try pasting"
+                                    onPaste={ ( event ) => {
+                                        const text = event.clipboardData.getData( 'text/plain' );
 
-                                if ( /^[0-9+]$/.test( text ) ) {
-                                    return;
-                                }
+                                        if ( /^[0-9+]$/.test( text ) ) {
+                                            return;
+                                        }
 
-                                let date;
-                                try{
-                                    date = new Date( text +  ' UTC' ).toISOString().split('T')[0]
-                                } catch ( e ) {
-                                    date = text.split('T')[0]
-                                }
+                                        let date;
+                                        try{
+                                            date = new Date( text +  ' UTC' ).toISOString().split('T')[0]
+                                        } catch ( e ) {
+                                            date = text.split('T')[0]
+                                        }
 
-                                event.preventDefault();
-                                setDate(date);
-                            } }
-                            style={{width:'100%'}}
-                        />
-                    </div>
-                    { books.length > 0 && <table>
-                        <colgroup>
-                            <col />
-                            <col style={ {width:'20%'}} />
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th scope="col">Cover</th>
-                                <th scope="col">Book</th>
-                                { domain && domain !== 'x.com' && <th scope="col">Time</th> }
-                                { ! domain && <th scope="col">Chapter</th> }
-                                { domain !== 'x.com' && <th scope="col">Extract (Optional)</th> }
-                                <th scope="col">Featured</th>
-                                <th scope="col">Negative</th>
-                                <th scope="col">External</th>
-                                <th scope="col">Unquote</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            { extracts.map( ( { name, author, featured, negative, extract, __external, unquote, time, chapter }, index ) => {
-                                function setExtract( newAttributes ) {
-                                    setExtracts( ( state ) => [
-                                        ...state.slice(0, index),
-                                        newAttributes( state[ index ] ),
-                                        ...state.slice(index + 1)
-                                    ] );
-                                }
-                                function remove() {
-                                    setExtracts( ( state ) => [
-                                        ...state.slice(0, index),
-                                        ...state.slice(index + 1)
-                                    ] );
-                                }
-                                return <Extract key={ index } { ...{ name, author, featured, negative, extract, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef } } />
-                            } ) }
-                            <tr colSpan="5"><td><button onClick={ () => onAdd() }>Add</button></td></tr>
-                        </tbody>
-                    </table> }
+                                        event.preventDefault();
+                                        setDate(date);
+                                    } }
+                                    style={{width:'100%'}}
+                                />
+                            </div>
+                            { books.length > 0 && <table>
+                                <colgroup>
+                                    <col />
+                                    <col style={ {width:'20%'}} />
+                                </colgroup>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Cover</th>
+                                        <th scope="col">Book</th>
+                                        { domain && domain !== 'x.com' && <th scope="col">Time</th> }
+                                        { ! domain && <th scope="col">Chapter</th> }
+                                        { domain !== 'x.com' && <th scope="col">Extract (Optional)</th> }
+                                        <th scope="col">Featured</th>
+                                        <th scope="col">Negative</th>
+                                        <th scope="col">External</th>
+                                        <th scope="col">Unquote</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    { extracts.map( ( { name, author, featured, negative, extract, __external, unquote, time, chapter }, index ) => {
+                                        function setExtract( newAttributes ) {
+                                            setExtracts( ( state ) => [
+                                                ...state.slice(0, index),
+                                                newAttributes( state[ index ] ),
+                                                ...state.slice(index + 1)
+                                            ] );
+                                        }
+                                        function remove() {
+                                            setExtracts( ( state ) => [
+                                                ...state.slice(0, index),
+                                                ...state.slice(index + 1)
+                                            ] );
+                                        }
+                                        return <Extract key={ index } { ...{ name, author, featured, negative, extract, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef } } />
+                                    } ) }
+                                    <tr colSpan="5"><td><button onClick={ () => onAdd() }>Add</button></td></tr>
+                                </tbody>
+                            </table> }
+                            <button type="submit" onClick={onSubmit} disabled={ isDuplicate || domain === 'twitter.com' || domain === 'youtu.be' }>Submit</button>
+                            <pre>{ JSON.stringify( source, null, 2 ) }</pre>
+                            {newBooks.map((book, index) => <pre key={index}>{JSON.stringify(book, null, 2)}</pre>)}
+                        </>
+                    }
                 </>}
-                <button type="submit" onClick={onSubmit} disabled={ isDuplicate || domain === 'twitter.com' || domain === 'youtu.be' }>Submit</button>
-                <pre>{ JSON.stringify( source, null, 2 ) }</pre>
-                {newBooks.map((book, index) => <pre key={index}>{JSON.stringify(book, null, 2)}</pre>)}
             </form>
         );
     }
