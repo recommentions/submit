@@ -32,6 +32,48 @@
         document.body.classList.toggle( 'loading', loading );
     }
 
+    // Zero-width characters mapping
+const ZERO_WIDTH_CHARACTERS = {
+  "0": "\u200C", // Zero Width Non-Joiner
+  "1": "\u200D", // Zero Width Joiner
+};
+
+// Function to encode text
+function encodeHiddenText(textToHide, carrierText) {
+  // Convert text to binary
+  let binaryString = Array.from(textToHide)
+    .map(char => char.charCodeAt(0).toString(2).padStart(8, '0'))
+    .join('');
+
+  // Map binary to zero-width characters
+  let hiddenText = binaryString
+    .split('')
+    .map(bit => ZERO_WIDTH_CHARACTERS[bit])
+    .join('');
+
+  // Append hidden text to the carrier text
+  return carrierText + hiddenText;
+}
+
+// Function to decode hidden text
+function decodeHiddenText(textWithHiddenMessage) {
+  // Extract zero-width characters
+  let zeroWidthChars = Array.from(textWithHiddenMessage).filter(char => Object.values(ZERO_WIDTH_CHARACTERS).includes(char)).join('');
+ 
+  // Convert zero-width characters back to binary
+  let binaryString = zeroWidthChars
+    .split('')
+    .map(char => (char === ZERO_WIDTH_CHARACTERS["0"] ? "0" : "1"))
+    .join('');
+
+  // Convert binary to original text
+  let decodedText = binaryString.match(/.{1,8}/g)
+    ?.map(bin => String.fromCharCode(parseInt(bin, 2)))
+    ?.join('');
+
+  return decodedText;
+}
+
     // Encode UTF-8 text to Base64
     function encodeToBase64(text) {
         const encoder = new TextEncoder();
@@ -186,6 +228,10 @@
         });
     }
 
+    function getBookId( b ) {
+        return `${ b.title }\n${ _.castArray( b.author ).join( '\n' ) }`;
+    }
+
     function Extract( { name, author: _author, featured, negative, extract: mention, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef } ) {
         const book = findBook( books, name );
         const [ bookResults, setBookResults ] = useState();
@@ -193,10 +239,6 @@
         const [ author, setAuthor ] = useState( _author );
         const [ coverIds, setCoverIds ] = useState();
         const [ pickedCoverIndex, setCoverIndex ] = useState( 0 );
-
-        function getBookId( b ) {
-            return `${ b.title }\n${ _.castArray( b.author ).join( '\n' ) }`;
-        }
 
         useEffect( () => {
             if ( book ) return;
@@ -289,7 +331,7 @@
         }
 
         function onDelete( event ) {
-            if ( event.key === 'Backspace' && ! event.target.textContent ) {
+            if ( event.key === 'Backspace' && ! event.target.value ) {
                 remove();
                 event.preventDefault();
             }
@@ -434,88 +476,37 @@
                     { ! book && 'First insert a book.' }
                 </td>
                 <td>
-                    <div
-                        data-placeholder="Title"
-                        contentEditable={ ! book }
-                        suppressContentEditableWarning
-                        ref={ useRefEffect( ( element ) => {
-                            element.addEventListener( 'paste', onPaste );
-                            element.addEventListener( 'beforeinput', onBeforeInput );
-                            return () => {
-                                element.removeEventListener( 'paste', onPaste );
-                                element.removeEventListener( 'beforeinput', onBeforeInput );
-                            };
-                        }, [] ) }
-                        onInput={ () => {
-                            const newTitle = event.target.textContent.trim();
-                            setTempTitle( newTitle );
+                    <input
+                        autoComplete="off"
+                        placeholder="Title"
+                        onChange={ (event) => {
+                            const hiddenValue = decodeHiddenText( event.target.value );
+                            if ( hiddenValue ) {
+                                setExtract( ( extract ) => ( {
+                                    ...extract,
+                                    name: hiddenValue,
+                                } ) );
+                            } else {
+                                setTempTitle( event.target.value );
+                            }
                         } }
                         onKeyDown={ onDelete }
                         readOnly={ !! book }
-                    >
-                        { title }
-                    </div>
-                    <div
-                        data-placeholder="Authors"
-                        contentEditable={ ! book }
-                        suppressContentEditableWarning
-                        ref={ useRefEffect( ( element ) => {
-                            element.addEventListener( 'paste', onPaste );
-                            element.addEventListener( 'beforeinput', onBeforeInput );
-                            return () => {
-                                element.removeEventListener( 'paste', onPaste );
-                                element.removeEventListener( 'beforeinput', onBeforeInput );
-                            };
-                        }, [] ) }
-                        onInput={ () => {
-                            const newAuthors = event.target.textContent.split(',').map(author => author.trim());
-                            setTempAuthors( newAuthors );
+                        value={ book ? title : tempTitle }
+                        list="book-list"
+                    />
+                    <input
+                        autoComplete="off"
+                        placeholder="Authors (comma separated)"
+                        onChange={ (event) => {
+                            setTempAuthors( event.target.value );
                         } }
                         readOnly={ !! book }
-                    >
-                        { authors.join( ', ' ) }
-                    </div>
-                    { ! book && ( tempTitle || !! tempAuthors?.length ) && <>
-                        <hr />
-                        <p>Select existing book:</p>
-                        <ul>
-                        { books.reduce( ( acc, book ) => {
-                            if ( acc.length === 10 ) return acc;
-
-                            const [tempMainTitle] = _.kebabCase( tempTitle ).split( ':' );
-                            const [mainTitle] = _.kebabCase( book.title ).split( ':' );
-                            
-                            // check authors
-                            if ( tempAuthors?.length ) {
-                                const bookAuthors = _.castArray( book.author );
-                                const tempAuthorsMatch = tempAuthors.every( tempAuthor => {
-                                    const _tempAuthor = _.kebabCase( tempAuthor );
-                                    return bookAuthors.some( bookAuthor => {
-                                        const _bookAuthor = _.kebabCase( bookAuthor );
-                                        return _bookAuthor.includes( _tempAuthor )
-                                    } )
-                                } );
-                                if ( ! tempAuthorsMatch ) return acc;
-                            }
-
-                            if ( mainTitle.includes( tempMainTitle ) ) {
-                                acc.push( book );
-                            }
-
-                            return acc;
-                        }, [] ).map( ( book, i ) => {
-                            return (
-                                <li key={i} onClick={ () => {
-                                    setExtract( ( extract ) => ( {
-                                        ...extract,
-                                        name: getBookId( book ),
-                                    } ) );
-                                } }>{ book.title } by { _.castArray( book.author ).join( ', ' ) }</li>
-                            );
-                        } ) }
-                        </ul>
-                    </> }
-                    { ! book && ( tempTitle ) && <button onClick={ addNewBook }>Or insert new book</button> }
+                        value={ book ? authors.join( ', ' ) : tempAuthors }
+                        list="author-list"
+                    />
+                    { ! book && ( tempTitle && tempAuthors ) && <button onClick={ addNewBook }>Or insert new book</button> }
+                    { book && <button onClick={remove}>Remove extract</button> }
                 </td>
                 { domain && domain !== 'x.com' && <td>
                     <div
@@ -917,12 +908,44 @@
                                     <tr colSpan="5"><td><button onClick={ () => onAdd() }>Add</button></td></tr>
                                 </tbody>
                             </table> }
+                            <datalist id="book-list">
+                                { books.reduce( ( acc, book ) => {
+
+                                    acc.push( book );
+
+                                    return acc;
+                                }, [] ).map( ( book, i ) => {
+                                    return (
+                                        <option key={i} value={ encodeHiddenText( getBookId( book ), book.title) }>
+                                            { _.castArray( book.author ).join( ', ' ) }
+                                        </option>
+                                    );
+                                } ) }
+                            </datalist>
+                            <datalist id="author-list">
+                                { books.reduce( ( acc, book ) => {
+                                    if ( book.author ) {
+                                        acc.add( _.castArray( book.author ).join( ', ' ) );
+                                    }
+                                    return acc;
+                                }, new Set() ).values().map( author => <option value={author} /> ) }
+                            </datalist>
                             <button type="submit" onClick={onSubmit} disabled={ isDuplicate || domain === 'twitter.com' || domain === 'youtu.be' }>Submit</button>
                             <pre>{ JSON.stringify( source, null, 2 ) }</pre>
                             {newBooks.map((book, index) => <pre key={index}>{JSON.stringify(book, null, 2)}</pre>)}
                         </>
                     }
                 </>}
+                { profiles.some(profile => profile.name === name) || !username &&
+                    <button type="submit" onClick={onSubmit} disabled={ isDuplicate || domain === 'twitter.com' || domain === 'youtu.be' }>Submit</button>
+                }
+                { profiles.some(profile => profile.name === name) &&
+                    <details>
+                        <summary>Debug</summary>
+                        <pre>{ JSON.stringify( source, null, 2 ) }</pre>
+                        {newBooks.map((book, index) => <pre key={index}>{JSON.stringify(book, null, 2)}</pre>)}
+                    </details>
+                }
             </form>
         );
     }
