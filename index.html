@@ -923,12 +923,12 @@ function decodeHiddenText(textWithHiddenMessage) {
                                 } ) }
                             </datalist>
                             <datalist id="author-list">
-                                { books.reduce( ( acc, book ) => {
+                                { Array.from(books.reduce( ( acc, book ) => {
                                     if ( book.author ) {
                                         acc.add( _.castArray( book.author ).join( ', ' ) );
                                     }
                                     return acc;
-                                }, new Set() ).values().map( author => <option value={author} /> ) }
+                                }, new Set() )).map( author => <option key={author} value={author} /> ) }
                             </datalist>
                             <button type="submit" onClick={onSubmit} disabled={ isDuplicate || domain === 'twitter.com' || domain === 'youtu.be' }>Submit</button>
                             <pre>{ JSON.stringify( source, null, 2 ) }</pre>
