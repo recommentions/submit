@@ -321,8 +321,16 @@ function decodeHiddenText(textWithHiddenMessage) {
             ).then( ( response ) => response.json() ).then( ( results ) => {
                 const [ firstResult ] = results.docs;
                 if ( firstResult?.cover_i ) {
-                    setBook( {
-                        openLibraryId: firstResult.cover_i
+                    setBooks( ( books ) => {
+                        const index = books.indexOf( book );
+                        return [
+                            ...books.slice(0, index),
+                            {
+                                ...books[ index ],
+                                openLibraryId: firstResult.cover_i
+                            },
+                            ...books.slice(index + 1)
+                        ]
                     } );
                 } else {
                     alert( 'First book has no cover, try picking one.' );
@@ -371,22 +379,22 @@ function decodeHiddenText(textWithHiddenMessage) {
         }, [ book ] );
 
         function addNewBook() {
+            const newTitle = tempTitle.trim();
+            const newAuthors = tempAuthors.split(',').map(author => author.trim());
+            const newBook = {
+                title: newTitle,
+                author: newAuthors,
+            };
             setBooks( ( books ) => [
                 ...books,
-                {
-                    title: tempTitle,
-                    author: tempAuthors,
-                },
+                newBook,
             ] );
+            onFetchFirstCover( newBook );
             setExtract( ( extract ) => {
                 return {
                     ...extract,
-                    name: [ tempTitle, ...tempAuthors ].join( '\n' ),
+                    name: [ newTitle, ...newAuthors ].join( '\n' ),
                 };
-            } );
-            onFetchFirstCover( {
-                title: tempTitle,
-                author: tempAuthors,
             } );
             setTempTitle();
             setTempAuthors();
@@ -931,8 +939,6 @@ function decodeHiddenText(textWithHiddenMessage) {
                                 }, new Set() )).map( author => <option key={author} value={author} /> ) }
                             </datalist>
                             <button type="submit" onClick={onSubmit} disabled={ isDuplicate || domain === 'twitter.com' || domain === 'youtu.be' }>Submit</button>
-                            <pre>{ JSON.stringify( source, null, 2 ) }</pre>
-                            {newBooks.map((book, index) => <pre key={index}>{JSON.stringify(book, null, 2)}</pre>)}
                         </>
                     }
                 </>}
