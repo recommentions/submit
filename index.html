@@ -8,7 +8,7 @@
 {
   "imports": {
     "react": "https://esm.sh/react@latest",
-    "react-dom": "https://esm.sh/react-dom@latest",
+    "react-dom/client": "https://esm.sh/react-dom@latest/client",
     "react/jsx-runtime": "https://esm.sh/react@latest/jsx-runtime",
     "@octokit/rest": "https://cdn.jsdelivr.net/npm/@octokit/rest@21.0.2/dist-src/index.min.js",
     "lodash": "https://esm.sh/lodash",
@@ -21,7 +21,7 @@
 <script type="text/babel" data-type="module">
     import { Octokit, App } from "octokit";
     import React, { useState, useEffect, useRef, useCallback } from "react";
-    import ReactDOM from "react-dom";
+    import ReactDOM from "react-dom/client";
     import _ from 'lodash';
     import removeAccents from 'remove-accents';
 
