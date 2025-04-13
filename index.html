@@ -802,6 +802,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                 event.preventDefault();
             }} method="POST" action="">
                 { !octokit && <>
+                    <p>Generate a new token <a href="https://github.com/settings/tokens/new">here</a> if needed. Give it a now such as "submit source". Only select <mark>repo</mark> scope.</p>
                     <input id="username" name="username" type="text" autoComplete="username" placeholder="username" />
                     <input id="password" name="password" type="password" autoComplete="current-password" placeholder="password" />
                     </> }
