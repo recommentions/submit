@@ -744,7 +744,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                         repo: 'source',
                         path: `books/${_.kebabCase(book.title + ' by ' + _.castArray(book.author).join(', '))}.json`,
                         message: `Add book: ${book.title} by ${_.castArray(book.author).join(', ')}`,
-                        content: encodeToBase64( JSON.stringify( book ) ),
+                        content: encodeToBase64( JSON.stringify( book, null, 2 ) ),
                     })
                 } ) ).catch( ( error ) => {
                     console.log(error);
@@ -756,7 +756,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                         repo: 'source',
                         path: `sources/${ _.kebabCase(source.name) }-${ _.kebabCase(source.source) }.json`,
                         message: `Add source for ${source.name}`,
-                        content: encodeToBase64( JSON.stringify( source ) ),
+                        content: encodeToBase64( JSON.stringify( source, null, 2 ) ),
                     }).then( ( { data } ) => {
                         alert(`Saved source for ${source.name}.`);
                         setExtracts([]);
@@ -788,7 +788,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                 repo: 'source',
                 path: `profiles/${_.kebabCase(name)}.json`,
                 message: `Add profile: ${name}`,
-                content: encodeToBase64( JSON.stringify( { name, hide: true } ) ),
+                content: encodeToBase64( JSON.stringify( { name, hide: true }, null, 2 ) ),
             })
             setProfiles( ( state ) => [
                 ...state,
