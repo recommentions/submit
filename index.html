@@ -232,7 +232,7 @@ function decodeHiddenText(textWithHiddenMessage) {
         return `${ b.title }\n${ _.castArray( b.author ).join( '\n' ) }`;
     }
 
-    function Extract( { name, author: _author, featured, negative, extract: mention, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef } ) {
+    function Extract( { name, author: _author, featured, negative, extract: mention, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef, initialBooks } ) {
         const book = findBook( books, name );
         const [ bookResults, setBookResults ] = useState();
         const [ selectedResult, setSelectedResult ] = useState();
@@ -449,17 +449,22 @@ function decodeHiddenText(textWithHiddenMessage) {
             };
         }, [] )
 
-        console.log({domain})
+        const isExistingBook = book && initialBooks.find( ( book ) => book.title === title && book.author.join(',') === authors.join(',') );
 
         return <>
             <tr>
                 <td>
-                    { book && ! ( book.isbn || book.openLibraryId ) && <button
+                    { book && ! isExistingBook && ! ( book.isbn || book.openLibraryId ) && <button
                         onClick={ () => onFetchFirstCover( book ) }
                     >
                         Pick first cover
                     </button> }
-                    { book && <Details modal summary={
+                    { book && isExistingBook && ( book.isbn || book.openLibraryId ) && <img
+                        src={ `https://covers.openlibrary.org/b/${ book.isbn ? 'isbn' : 'id' }/${ book.isbn || book.openLibraryId }-L.jpg` }
+                        style={ { maxWidth: '100px' } }
+                        loading="lazy"
+                    /> }
+                    { book && ! isExistingBook && <Details modal summary={
                         <>
                             { book && ( book.isbn || book.openLibraryId ) && <img
                                 src={ `https://covers.openlibrary.org/b/${ book.isbn ? 'isbn' : 'id' }/${ book.isbn || book.openLibraryId }-L.jpg` }
@@ -482,6 +487,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                         <CoversModal book={ book } setBook={ setBook } />
                     </Details> }
                     { ! book && 'First insert a book.' }
+                    { isExistingBook && ! ( book.isbn || book.openLibraryId ) && 'No cover.' }
                 </td>
                 <td>
                     <input
@@ -912,7 +918,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                                                 ...state.slice(index + 1)
                                             ] );
                                         }
-                                        return <Extract key={ index } { ...{ name, author, featured, negative, extract, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef } } />
+                                        return <Extract key={ index } { ...{ name, author, featured, negative, extract, __external, unquote, time, chapter, setExtract, remove, books, setBooks, domain, iframeRef, initialBooks } } />
                                     } ) }
                                     <tr colSpan="5"><td><button onClick={ () => onAdd() }>Add</button></td></tr>
                                 </tbody>
