@@ -20,7 +20,7 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="text/babel" data-type="module">
     import { Octokit, App } from "octokit";
-    import React, { useState, useEffect, useRef, useCallback } from "react";
+    import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
     import ReactDOM from "react-dom/client";
     import _ from 'lodash';
     import removeAccents from 'remove-accents';
@@ -240,6 +240,8 @@ function decodeHiddenText(textWithHiddenMessage) {
         const [ coverIds, setCoverIds ] = useState();
         const [ pickedCoverIndex, setCoverIndex ] = useState( 0 );
 
+        console.log({_author})
+
         useEffect( () => {
             if ( book ) return;
 
@@ -375,7 +377,7 @@ function decodeHiddenText(textWithHiddenMessage) {
             if ( book ) return;
             const [ title, ...authors ] = name.split('\n');
             setTempTitle( title );
-            setTempAuthors( authors );
+            setTempAuthors( authors.join(',') );
         }, [ book ] );
 
         function addNewBook() {
@@ -591,11 +593,32 @@ function decodeHiddenText(textWithHiddenMessage) {
     }
 
     function Profiles() {
+        const backup = useMemo(() => {
+            let source;
+            let newBooks;
+            try {
+                source = JSON.parse(localStorage.getItem('recommentions-source'));
+                newBooks = JSON.parse(localStorage.getItem('recommentions-new-books'));
+            } catch (e) {}
+            return {
+                source: {
+                    name: source?.name || '',
+                    source: source?.source || '',
+                    content: source?.content || '',
+                    date: source?.date || '',
+                    extracts: source?.extracts || [],
+                },
+                newBooks: newBooks || [],
+            };
+        }, []);
+
+        console.log({backup})
+
         const [octokit, setOctokit] = useState(
             sessionStorage.getItem('password') ? new Octokit({ auth: sessionStorage.getItem('password') }) : undefined
         );
         const [initialBooks, setInitialBooks] = useState([]);
-        const [ books, setBooks ] = useState( [] );
+        const [ books, setBooks ] = useState( backup.newBooks );
         const [ profiles, setProfiles ] = useState( [] );
 
         useEffect(() => {
@@ -617,7 +640,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                 }).then( ( { data } ) => {
                     const lines = decodeFromBase64( data.content ).split( '\n' );
                     const books = lines.map( ( line ) => JSON.parse( line ) );
-                    setBooks( books );
+                    setBooks( ( currentBooks ) => [ ...books, ...currentBooks ] );
                     setInitialBooks( books );
                 } ).catch( () => {
                     setOctokit();
@@ -628,11 +651,11 @@ function decodeHiddenText(textWithHiddenMessage) {
         },[octokit]);
         
         const [username, setUsername] = useState();
-        const [name, setName] = useState('');
-        const [url, setURL] = useState('');
-        const [text, setText] = useState('');
-        const [date, setDate] = useState('');
-        const [extracts, setExtracts] = useState([]);
+        const [name, setName] = useState(backup.source.name);
+        const [url, setURL] = useState(backup.source.source);
+        const [text, setText] = useState(backup.source.content);
+        const [date, setDate] = useState(backup.source.date);
+        const [extracts, setExtracts] = useState(backup.source.extracts);
         const [isDuplicate, setDuplicate] = useState(false);
 
         function onPasteURL( event ) {
@@ -757,6 +780,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                     alert('Saving books failed.');
                 }).then( () => {
                     setInitialBooks( books );
+                    localStorage.removeItem('recommentions-new-books');
                     octokit.rest.repos.createOrUpdateFileContents({
                         owner: 'recommentions',
                         repo: 'source',
@@ -764,6 +788,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                         message: `Add source for ${source.name}`,
                         content: encodeToBase64( JSON.stringify( source, null, '\t' ) ),
                     }).then( ( { data } ) => {
+                        localStorage.setItem('recommentions-source', JSON.stringify({name: source.name}));
                         alert(`Saved source for ${source.name}.`);
                         setExtracts([]);
                         setURL('');
@@ -783,6 +808,7 @@ function decodeHiddenText(textWithHiddenMessage) {
                 path: 'sources.txt',
             }).then( ( { data } ) => {
                 const lines = decodeFromBase64( data.content ).split( '\n' );
+                console.log(lines.length, lines[lines.length - 1])
                 setDuplicate( lines.includes( value ) );
             } );
         }
@@ -802,6 +828,12 @@ function decodeHiddenText(textWithHiddenMessage) {
             ] );
             setLoading(false);
         }
+
+        // Store debug JSON in local storage
+        useEffect(() => {
+            localStorage.setItem('recommentions-source', JSON.stringify(source));
+            localStorage.setItem('recommentions-new-books', JSON.stringify(newBooks));
+        }, [source, newBooks]);
 
         return (
             <form onSubmit={(event) => {
